@@ -1,0 +1,139 @@
+---
+title: "Homework 4"
+author: "Isabella Chittumuri"
+date: "10/11/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Incubation temperature can affect the sex of turtles. An experiment was conducted
+with three independent replicates for each temperature and the number of male
+and female turtles born was recorded and can be found in the turtle dataset.
+
+```{r}
+# Install packages
+library(dplyr)
+library(faraway)
+library(tidyverse)
+```
+
+```{r}
+# Get dataset
+data("turtle")
+?turtle
+summary(turtle)
+head(turtle)
+```
+
+(a) Plot the proportion of males against the temperature. Comment on the nature of the relationship.
+
+```{r}
+# Get the proportion of males
+turtle$prop_male <- ifelse(turtle$female == 0, 1, (turtle$male)/(turtle$male+turtle$female))
+
+# Plot it against temp
+plot(turtle$temp, turtle$prop_male)
+```
+
+Looking at this graph, we see that the proportion of males hatched increases as temperature increases, even though there isn't a clear linear relationship between the two.
+
+(b) Fit a binomial response model with a linear term in temperature. Does this model fit the data?
+
+```{r}
+# Binomial model
+bmod1 <- glm(cbind(male, female) ~ temp, family="binomial", turtle)
+summary(bmod1)
+```
+
+The null deviance shows how well the response is predicted by the model with nothing but an intercept. The residual deviance shows how well the response is predicted by the model when the predictors are included. The binomial model summary shows that the residual deviance has a value of 24.9, much lower than the null deviance with value of 74.5. This means that model with the predictors preforms better than without. We can test this using the chi-squared test of the difference between the deviances of the binomial model and the null model.
+
+```{r}
+#Chi-squared test, p-value
+pchisq(74.508-24.942,1,lower=FALSE)
+```
+
+The chi-squared test gives us a p-value of 1.9e-12. This is a lot less than .05, suggesting that adding the predictor temp is helpful in predicting the outcome of sex in turtles.
+
+```{r}
+# Get temp in .1 increments
+x <- seq(27,30, .1)
+
+# Plot the model
+plot(prop_male ~ temp, data = turtle, xlim = c(27,30), ylim = c(0,1),
+     xlab = "Temperature", ylab = "Proportion of Males")
+lines(x, ilogit(-61.3183 + 2.2110 * x))
+```
+
+This graph shows the binomial model overlayed with the proportion of males against temperature. Overall the model fits the data well, regardless of the minor overfitting and underfitting.
+
+(c) Is this data sparse?
+
+Yes, the data is sparse because there isn't a lot of data. There are only 15 observation with only one predictor.
+
+(d) Check for outliers.
+
+```{r}
+# Half normal plot
+residuals <- residuals(bmod1)
+x <- abs(residuals)
+labord <- order(x)
+x <- sort(x)
+i <- order(x)
+n <- length(x)
+halfnormal_quant <- qnorm((n + 1:n)/(2 * n + 1))
+data.frame(
+  halfnormal_quant = halfnormal_quant,
+  abs_residuals = x[i]
+) %>% 
+  ggplot(aes(x = halfnormal_quant, y = abs_residuals)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "longdash") +
+  coord_equal()
+```
+
+This plot shows a half normal distribution. The absolute value of the residuals is on a relatively straight linear line, adjacent to the half normal distribution line (dashed line). Based on this plot, there are no apparent outliers.
+
+(e) Compute the empirical logits and plot these against temperature. Does this indicate a lack of fit?
+
+```{r}
+# Interaction plot
+turtle['elogit'] <- with(turtle,log((prop_male + 0.5)/(1 - prop_male +0.5)))
+plot(elogit~temp, turtle)
+with(turtle,interaction.plot(temp,male,elogit))
+```
+
+The first plot shows the empirical logits of the proportion of males against temperature. This graph is similar to the our graph in part (a). The second plot shows the interaction between number of males against that of the empirical logit. There seems to be something weird going on in this graph, but it doesn't indicate a lack of fit.
+
+(f) Add a quadratic term in temperature. Is this additional term a significant predictor of the response. Does the quadratic model fit the data?
+
+```{r}
+# Binomial model using quadratic term in temp
+bmod2 <- glm(cbind(male, female) ~temp + I(temp^2), family="binomial", turtle)
+summary(bmod2)
+```
+
+Yes, the additional term (temp^2) is a significant predictor of the response, with the same level of significance as the intercept and temperature.
+
+```{r}
+# Plot the model using temp^2
+x <- seq(27,30, .1)
+plot(prop_male ~ temp, data = turtle, xlim = c(27,30), ylim = c(0,1),
+     xlab = "Temperature", ylab = "Proportion of Males")
+lines(x, ilogit(-677.595 +(45.9173*x)- (.7745 * x^2)))
+```
+
+This quadratic model's summary shows that the residual deviance has a value of 20.25, much lower than the null deviance with value of 74.5. Note, this is also lower than the previous model that had a residual deviance of 24.9. This means that the quadratic model fits the data better. Again, we can test this using the chi-squared test of the difference between the deviances of the binomial model and the null model.
+
+```{r}
+#Chi-squared test, p-value
+pchisq(74.508-20.256,2,lower=FALSE)
+```
+
+The chi-squared test gives us a p-value of 1.6e-12. This is a lot less than .05, suggesting that adding the quadratic predictor temp^2 is helpful in predicting the outcome of sex in turtles. It is also lower than the chi-squared test p-value of the previous model.
+
+
+
+

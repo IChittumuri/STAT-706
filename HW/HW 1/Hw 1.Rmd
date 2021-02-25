@@ -1,0 +1,50 @@
+---
+title: 'R for Data Science: Exercise 3.2.4 '
+author: "Isabella Chittumuri"
+date: "September 2, 2020"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+<font size = "3"> **1.** </font>
+```{r}
+ggplot((data = mpg))
+```
+
+<font size = "2"> The output is an empty graph. </font>
+
+
+<font size = "3"> **2.** </font>
+```{r}
+ggplot2::mpg
+```
+
+<font size = "2"> There are 234 rows and 11 columns. </font>
+
+
+<font size = "3"> **3.** </font>
+```{r}
+?mpg
+```
+
+<font size = "2"> drv is the type of drive train, where f = front-wheel drive, r = rear wheel drive, 4 = 4wd. </font>
+
+
+<font size = "3"> **4.** </font>
+```{r}
+ggplot(mpg) +
+  geom_point(mapping = aes(x = hwy, y = cyl))
+```
+
+
+<font size = "3"> **5.** </font>
+```{r}
+ggplot(mpg) +
+  geom_point(mapping = aes(x = class, y = drv))
+```
+
+<font size = "2"> This plot is not useful because there is no correlation between the two variables. It is just showing you what type of cars have a certain type of drive train. </font>
