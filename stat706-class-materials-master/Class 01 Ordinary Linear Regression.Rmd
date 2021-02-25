@@ -1,0 +1,556 @@
+---
+title: "GLM I - Ordinary Linear Regression"
+subtitle: "August 27th, 2020"
+output:
+  ioslides_presentation:
+    incremental: true
+    widescreen: true
+    smaller: true
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.align = 'center')
+```
+
+# Setting the stage
+
+## Dataset
+
+We will use the [`palmerpenguins`](https://allisonhorst.github.io/palmerpenguins/) dataset to demonstrate.
+
+```{r fig.align='center', message=FALSE, warning=FALSE, out.width="80%"}
+library(palmerpenguins)
+library(printr) # helps automatically print nice tables in presentation
+library(ggplot2)
+theme_set(theme_minimal()) # automatically set a simpler ggplot2 theme for all graphics
+knitr::include_graphics('resources/lter_penguins.png')
+```
+
+<font size = "3">
+artwork by @allison_horst
+</font>
+
+## Let's explore {.build}
+
+
+```{r, echo = TRUE}
+summary(penguins)
+peng <- penguins[complete.cases(penguins), ]
+```
+
+```{r, include = FALSE}
+# `include = FALSE` means that the code will run but 
+mod <- lm(flipper_length_mm ~ body_mass_g, data = peng)
+intercept <- coef(mod)[1]
+slope <- coef(mod)[2]
+```
+
+## Define a relationship {.build}
+
+_Y = `body_mass_g`_
+
+_X = `flipper_length_mm`_
+
+$$
+\begin{aligned}
+Y &= f(X) \\
+Y &= \beta_0 + \beta_1X \\
+\end{aligned}
+$$
+$$
+\begin{aligned}
+\beta_0 &= 137, \beta_1 = .015 \\
+Y &= 137 + .015X
+\end{aligned}
+$$
+
+## Define a relationship - Plot {.build}
+
+```{r echo=TRUE, fig.height=4}
+sim_data <- data.frame(
+  body_mass_g = seq(from = 2700, to = 6300, length.out = 400)
+)
+sim_data$flipper_length_mm <- 137 + sim_data$body_mass_g * .015
+ggplot(sim_data, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_line()
+```
+
+
+## Interpertation {.build}
+
+$$
+\begin{aligned}
+\beta_0 &= 137, \beta_1 = .015 \\
+Y &= 137 + .015X
+\end{aligned}
+$$
+
+- What does $\beta_0$ and $\beta_1$ represent?
+- What are we missing?
+
+<div class = "notes">
+A statistical relation, unlike a functional relation, is not a perfect one. In general, the observations for a statistical relation do not follow directly on-the curve of relationship.
+</div>
+
+## Overlay the actual data {.build}
+
+```{r}
+ggplot(sim_data, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_line(aes(color = "fitted line")) +
+  geom_point(data = peng, aes(color = "observed data")) +
+  scale_color_manual(values = c("observed data" =  "#9ebcda",
+                                "fitted line" = "black"), name = "")
+```
+
+## How do we model the data generating process?
+
+- How can we better mimic the data that we see?
+- We can add random noise
+- What kind of random noise can we add?
+- What can we say about the random noise?
+
+
+## Random Variables - an aside{.build}
+
+```{r, echo=FALSE, out.width="90%"}
+par(mfrow=c(2,2))
+hist(rnorm(1000, mean = 0, sd = 1))
+hist(rt(1000, df = 10000))
+
+hist(runif(1000, min = -1, max = 1))
+hist(rpois(1000, lambda = 30) - 30)
+```
+
+## Random Variables | learn more
+
+```{r, echo = TRUE}
+?distribution
+```
+
+
+## Add in random noise
+
+```{r, echo = TRUE}
+sim_data$flipper_length_mm_w_noise <- 
+  sim_data$flipper_length_mm + rnorm(nrow(sim_data), mean = 0, sd = 6.8)
+```
+
+```{r}
+ggplot(sim_data, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_line(aes(color = "fitted line")) +
+  geom_point(data = peng, aes(color = "observed data"), alpha = 0.5) +
+  scale_color_manual(values = c("observed data" =  "#9ebcda",
+                                "fitted line" = "black"), name = "") +
+  geom_point(aes(y = flipper_length_mm_w_noise))
+```
+
+## Formal Statement of Model {.build}
+
+$$
+Y_i = \beta_0 = \beta_1X_i + \epsilon_i
+$$
+
+- $Y_i$ is the value of the response variable in the $i$th observation
+- $\beta$s are the parameters
+- $X_i$ is a known constant
+- $\epsilon_i$ is a random error term with $E\{\epsilon_i\} = 0$, $Var\{\epsilon_i\} = \sigma^2$ and $\sigma\{\epsilon_i, \epsilon_j\} = 0$ for all $i, j; i \neq j$
+
+## Features of Model {.build}
+
+- Since $E\{\epsilon_i\} = 0$ we can show that  $E\{Y_i\} = \beta_0 + \beta_1X_i$
+- Similarly $\sigma^2\{Y_i\} = \sigma^2$
+- Because error terms are uncorrelated - Y's are uncorrelated
+
+## Interpertation and Alternative Form {.build}
+
+- Recall what $\beta_0$ generally represents in this example
+- We can rewrite so that:
+
+$$
+Y_i = \beta_0^* + \beta_1(X_i - \bar{X}) + \epsilon_i
+$$
+
+```{r, echo = TRUE}
+summary(peng$body_mass_g)
+```
+
+# Estimating the parameters
+
+## How do we know which line is better?
+
+```{r}
+ggplot(penguins, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_point(aes(color = "observed data")) +
+  geom_abline(color = "#fb9a99", intercept = 137, slope = 0.015, show.legend = T) + 
+  geom_abline(intercept = 90, slope = 0.025, color = "#33a02c") + 
+  scale_color_manual(values = c("observed data" =  "#9ebcda")) +
+  labs(title = "Which line fits better?", color = "")
+```
+
+## Method of Least Squares {.build}
+
+- We want to minimize $Q$ where:
+
+$$
+Q = \sum^n_{i=1}{(Y_i - \beta_0 - \beta_1X_i)^2}
+$$
+our estimates for $\beta_0$ and $\beta_1$ will be $\hat\beta_0$ and $\hat\beta_1$, respectively.
+
+## Method of Least Squares: Visual {.build}
+
+```{r, include=FALSE}
+library(dplyr)
+```
+
+```{r}
+set.seed(202008)
+
+d_least_squares <- penguins %>% 
+  mutate(line1 = 137 + .015*body_mass_g,
+         line2 = 90 + .025*body_mass_g) %>% 
+  sample_n(4) %>% 
+  select(body_mass_g, flipper_length_mm, line1, line2)
+
+d_least_squares %>% 
+  ggplot(aes(x = body_mass_g)) +
+  geom_point(aes(y = flipper_length_mm, color = "observed data")) +
+  geom_line(aes(y = line1), color = "#fb9a99") + 
+  geom_linerange(aes(ymin = line1, ymax = flipper_length_mm), color = "#fb9a99", linetype = "longdash") + 
+  geom_line(aes(y = line2), color = "#33a02c") + 
+  geom_abline(intercept = 90, slope = 0.025, color = "#33a02c") + 
+  scale_color_manual(values = c("observed data" =  "#9ebcda")) +
+  labs(color = "")
+```
+
+## Calculate _Q_ | Definitions {.build}
+
+- Line1: $Y = 137 + .015X$
+- Line2: $Y = 90 + .025X$
+
+```{r}
+d_least_squares
+```
+
+## Calculate _Q_ | Definitions {.build}
+
+```{r, echo = TRUE}
+with(d_least_squares, sum((line1 - flipper_length_mm)^2))
+with(d_least_squares, sum((line2 - flipper_length_mm)^2))
+```
+
+## How do you solve for best $\hat\beta_0$ and $\hat\beta_1$? | Numerical Search {.build}
+
+```{r}
+all_params <- expand.grid(
+  b0 = seq(-500, 500, length.out = 100),
+  b1 = seq(-.125, .125, length.out = 100)
+)
+
+calculate_q <- function(b0, b1){
+  raw_diff <- with(peng, flipper_length_mm - (b0 + b1*body_mass_g))
+  Q <- sum(raw_diff^2)
+  Q
+}
+
+all_params$Q <- purrr::pmap_dbl(all_params, calculate_q)
+
+ggplot(all_params, aes(x = b0, y = b1, fill = Q,color = NULL)) +
+  geom_tile() +
+  scale_fill_gradient(trans = "log", ) +
+  geom_point(aes(x = 137, y = .015), color = "white", shape = 3) +
+  labs(title = "Numerical Search for lowest Q")
+```
+
+## What are problems with this approach? {.build}
+
+- Too slow with lots of parameters (although there are plenty of functions that optimize more efficiently like `optim`).
+- If we are looking there is a better way
+
+
+## How do you solve for best $\hat\beta_0$ and $\hat\beta_1$? | Analytic Approach {.build}
+
+$$
+\hat\beta_1 = \frac{\sum{(X_i - \bar{X})(Y_i - \bar{Y})}}{\sum{(X_i - \bar{X})^2}}
+$$
+
+$$
+\hat\beta_0 = ???
+$$
+- $\hat\beta_0 = \bar{Y} - \hat\beta_1\bar{X}$
+- What happens to that equation when we center $X$?
+
+- See this [link for a proof](https://are.berkeley.edu/courses/EEP118/current/derive_ols.pdf)
+
+- What happens if we get more data points?
+
+## Solve for $\hat{\beta_1}$ and $\hat{\beta_0}$
+
+```{r, echo = TRUE}
+x_bar <- mean(peng$body_mass_g)
+y_bar <- mean(peng$flipper_length_mm)
+
+beta_1 <- sum((peng$body_mass_g - x_bar)*(peng$flipper_length_mm - y_bar))/sum((peng$body_mass_g - x_bar)^2)
+beta_0 <- y_bar - beta_1*x_bar
+
+beta_0
+beta_1
+```
+
+## Point Estimation {.build}
+
+- If I have a penguin that is 3K, how long do I expect that penguin's flipper to be?
+
+```{r}
+beta_0 + beta_1*3000
+```
+
+
+## Residuals {.build}
+
+- $e_i = Y_i - \hat{Y_i} = Y_i - (\hat\beta_0 + \hat\beta_1X_i)$
+- What is this related to?
+
+```{r}
+residuals <- peng$flipper_length_mm - (beta_0 + beta_1*peng$body_mass_g)
+hist(residuals)
+```
+
+
+## Properties {.build}
+
+- $\sum^{n}_{i = 1} {e_i} =  ?$ 
+    - $\sum^{n}_{i = 1} {e_i} = 0$
+
+- $\sum^{n}_{i = 1} {e_i^2} = ?$ 
+   - It's a minimum (it's the same as Q)
+   
+- $\sum{Y_i} = \sum{\hat{Y}}$
+- $\sum{X_ie_i} = 0$
+- $\sum{\hat{Y_i}e_i} = 0$
+- The regression line will always go through $(\bar{X}, \bar{Y})$
+
+## Estimation of $\sigma^2$ | Sample Variance
+
+- The true variance is $\sigma^2$, estimate it with $\hat{\sigma}^2$
+
+$$
+\hat{\sigma}^2 = \frac{\sum^n_{i=1}{(Y_i - \bar{Y})^2}}{n - 1}
+$$
+
+- Why $n-1$?
+
+## Estimation of $\sigma^2$ | An Aside (1)
+
+```{r, echo = TRUE}
+calc_sds <- function(n, true_mean = 0, true_sd = 1){
+  x <- rnorm(n, mean = true_mean, sd = true_sd)
+  x_bar <- mean(x)
+  
+  list(
+    true_mean = true_mean,
+    true_sd = true_sd,
+    s_wrong =  sum((x - x_bar)^2)/n,
+    s_cheat = sum((x - true_mean)^2)/n,
+    s_standard = sum((x - x_bar)^2)/(n - 1)
+  )  
+}
+```
+
+## Estimation of $\sigma^2$ | An Aside (2)
+
+```{r}
+set.seed(10)
+res <- purrr::map_df(rep(3, 1000), calc_sds)
+res <- tidyr::pivot_longer(res, s_wrong:s_standard, names_to = "type", values_to = "sd_est") 
+res_summary <- res %>% group_by(type) %>% summarise(sd_est_mean = mean(sd_est), .groups = "drop")
+
+res %>% 
+  ggplot(aes(x = type, y = true_sd-sd_est)) +
+  geom_boxplot() +
+  coord_flip(ylim = c(-1,1)) +
+  geom_hline(yintercept = 0, linetype = "longdash") +
+  labs(title = "Various ways of estimating population variance",
+       caption = "1000 samples of 3 patients drawn from a normal(0,1) distribution\n Red dots show mean error") +
+  geom_point(aes(y = sd_est_mean -1 ), data = res_summary, color = "red")
+```
+
+## Estimation of $\sigma^2$ | An Aside (3)
+
+```{r}
+set.seed(10)
+res <- purrr::map_df(rep(100, 1000), calc_sds)
+res <- tidyr::pivot_longer(res, s_wrong:s_standard, names_to = "type", values_to = "sd_est") 
+res_summary <- res %>% group_by(type) %>% summarise(sd_est_mean = mean(sd_est), .groups = "drop")
+
+res %>% 
+  ggplot(aes(x = type, y = true_sd-sd_est)) +
+  geom_boxplot() +
+  coord_flip(ylim = c(-1,1)) +
+  geom_hline(yintercept = 0, linetype = "longdash") +
+  labs(title = "Various ways of estimating population variance",
+       subtitle = "100 patients per sample",
+       caption = "1000 samples of 100 patients drawn from a normal(0,1) distribution\n Red dots show mean error") +
+  geom_point(aes(y = sd_est_mean -1 ), data = res_summary, color = "red")
+```
+
+
+## Estimation of $\sigma^2$ {.build}
+
+- Error sum of squares
+$$
+SSE = \sum^n_{i = 1}(Y_i - \hat{Y_i})^2 \\
+$$
+
+- Error mean square
+
+$$
+\hat{\sigma}^2  = MSE = \frac{SSE}{n-2}
+$$
+
+$$
+E\{MSE\} = \sigma^2
+$$
+
+## Estimation of $\sigma^2$ {.build}
+
+```{r, echo = TRUE}
+sse <- sum(residuals^2)
+mse <- sse/(length(residuals)-2)
+mse
+sqrt(mse)
+```
+
+
+# Maximum Liklihood Estimation
+
+## Motivation
+
+- No matter what may be the form of the distribution of the error terms the least squares method provides unbiased point estimators of $\beta_0$ and $\beta_1$, that have minimum variance among all unbiased linear estimators. To set up interval estimates and make tests, however, we need to make an assumption about the form of the distribution of
+the error terms.
+
+## Set Up
+
+- How to define the mean/standard deviation
+
+```{r, echo=TRUE}
+X <- c(250, 265, 259)
+```
+
+- Is it more likely to come from `normal(230, 10)` or `normal(260, 5)`
+
+## Set Up | Visualization
+
+```{r, echo = TRUE}
+op_1_sample <- rnorm(10000, 230, 10)
+op_2_sample <- rnorm(10000, 260, 5)
+```
+
+```{r}
+samp_df <- bind_rows(
+  data.frame(samp = op_1_sample,
+             dist = "normal(230, 10)"),
+   data.frame(samp = op_2_sample,
+             dist = "normal(260, 5)")
+) 
+
+samp_df %>% 
+  ggplot(aes(x = samp)) +
+  geom_density() +
+  facet_wrap(~dist) +
+  geom_point(data = data.frame(samp = X), y = 0, color = "red")
+```
+
+## Sampling vs Density Function
+
+$$
+L(\mu, \sigma | x) = \frac{1}{\sqrt{2\pi}\sigma}e^{-\frac{(x-\mu)^2}{2\sigma^2}}
+$$
+
+```{r, echo = TRUE}
+raw_norm_eq <- function(x, mu, sigma){
+  1/sqrt(2*pi*sigma^2) * exp(-((x-mu)^2/(2*sigma^2)))
+}
+
+all.equal(raw_norm_eq(210:260, mu = 230, sigma = 10),
+          dnorm(210:260, mean = 230, 10))
+```
+
+
+## Liklihood Calculation
+
+```{r, echo = TRUE}
+lh <- data.frame(X = X,
+           opt_1_l = dnorm(X, mean = 230, 10), 
+           opt_2_l = dnorm(X, mean = 260, sd = 5))
+```
+
+
+```{r, echo = TRUE}
+prod(lh$opt_1_l)
+prod(lh$opt_2_l)
+```
+
+## LogLiklihood Calculation
+
+- Multiplying ever smaller numbers becomes a problem for the computer so we often work with the logliklihood
+
+```{r, echo = TRUE}
+sum(log(lh$opt_1_l))
+sum(log(lh$opt_2_l))
+```
+
+## Finding Optimal Points {.build}
+
+- keep sigma constant at 10
+- vary the mean
+
+```{r}
+expand.grid(mean = 210:300, 
+            sd = 10) %>% 
+  mutate(LL = purrr::map2_dbl(mean, sd, ~sum(dnorm(X, .x, .y, log = T)))) %>% 
+  ggplot(aes(x = mean, y = LL)) +
+  geom_line()
+
+```
+
+- what can we see about the graph if it is 'pointier'?
+- How can we quantify pointiness?
+
+## Application to regression
+
+
+$$
+\begin{aligned}
+L(\mu, \sigma | x) & = \frac{1}{\sqrt{2\pi}\sigma}e^{-\frac{(x-\mu)^2}{2\sigma^2}} \\
+\mu & = \beta_0 + \beta_1X_i, x = Y_i \\
+L(\beta_0, \beta_1, \sigma | X, Y) & = \frac{1}{\sqrt{2\pi}\sigma}e^{-\frac{(Y_i - \beta_0 - \beta_1X_i)^2}{2\sigma^2}} 
+\end{aligned}
+$$
+
+For _n_ points:
+
+$$
+\begin{aligned}
+L(\beta_0, \beta_1, \sigma) & = \prod^{n}_{i=1}\frac{1}{\sqrt{2\pi}\sigma}e^{-\frac{(Y_i - \beta_0 - \beta_1X_i)^2}{2\sigma^2}} \\
+\end{aligned}
+$$
+
+## Solving the parameters
+
+- $\beta_0$ and $\beta_1$ are estimated the same as with least squares
+
+$$
+\hat{\sigma}^2 = \frac{\sum{(Y_i - \hat{Y_i})^2}}{n}
+$$
+```{r}
+peng$body_mass_g_cent <- peng$body_mass_g - mean(peng$body_mass_g)
+
+summary(peng$body_mass_g_cent)
+
+lm(flipper_length_mm ~ body_mass_g_cent + 1, data = peng)
+
+lm(flipper_length_mm ~ body_mass_g + 1, data = peng)
+```
+
