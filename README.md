@@ -13,10 +13,13 @@ Extending the Linear Model with R: Generalized Linear, Mixed Effects and Nonpara
 Optional Texts:
 
 Applied Linear Statistical Models, 5th edition, Kutner, Naschtsheim, Neter and Li
+
 Statistical Rethinking, 2nd edition, McElreath
-R for Data Science, Wickham - http://r4ds.had.co.nz
+
+R for Data Science, Wickham
    
 Materials Cover:
+
 Course Overview, Basics of R
 OLS: Linear Regression with one predictor
 OLS: Multiple Variable Regression, Hypothesis Testing, Diagnostics
