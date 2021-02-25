@@ -1,0 +1,112 @@
+---
+title: "Midterm"
+author: "Isabella Chittumuri"
+date: "10/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 2
+Textbook pg 7 at last paragrpah 
+
+# 4
+you're given an interval and you have a 95% CI that you're 
+
+
+Maybe
+# 4
+# 6
+# 7
+# 20
+# 27, maybe AIC
+# 28, F test based on tb
+
+Ask Professor
+# 20
+# 26 from .5-.7 how will the cutoff change 
+
+
+# 10
+
+```{r}
+mtcars
+```
+
+```{r}
+lmod <- lm(mpg ~ hp, data = mtcars)
+summary(lmod)
+```
+
+```{r}
+# Make predictions using lmod
+mtcars$pred <- predict(lmod, mtcars, type = "response")
+
+# Make fake data to make the model line more smooth
+mtcars_fake <- data.frame(hp = seq(50, 355, length.out = 1))
+mtcars_fake$pred <- predict(lmod, mtcars_fake, type = "response")
+
+# Overlay the model with the predictions
+mtcars %>% 
+  ggplot(aes(x = hp, y = mpg)) +
+  geom_point() +
+  geom_smooth(method = "lm", method.args = list(family = "binomial")) +
+  geom_line(data = mtcars_fake, aes(y = pred), linetype = "longdash")
+```
+
+# 11
+```{r}
+x <- matrix(c(8,4,0,-4,-8,7.8,9.0,10.2,11.0,11.7), ncol = 2, nrow = 5, byrow = F)
+
+df <- as.data.frame(x)
+```
+
+```{r}
+lmod <- lm(V2 ~ V1, data = df)
+summary(lmod)
+```
+
+# 14
+ chapter 2.2, pg 28
+
+
+# 19
+
+What is the lower 95% confidence interval (from the output above) for a 2 unit change in BNucl on the odds ratio scale? Use the normal approximation for the estimate – you can use 1.96 as the multiplier for a 95% confidence interval.
+
+```{r}
+BNucl_diff <- 2
+
+library(faraway)
+wbca
+
+mod <- glm(Class ~ Adhes + BNucl, family = "binomial", data = wbca)
+summary(mod)
+
+exp_mod <- exp(coef(mod)); exp_mod
+```
+
+```{r}
+tidy_mod <- broom::tidy(mod, conf.int = T) %>% 
+  filter(term == "BNucl"); tidy_mod
+```
+
+```{r}
+library(tidyverse)
+tidy_mod %>% 
+  select(estimate, conf.low, conf.high) %>%
+  mutate_all(~exp(.*BNucl_diff))
+```
+
+```{r}
+# check
+odds_ratio <- exp(-0.7436686 * 2); odds_ratio
+
+# Calcute log(OR) bc CI is calcuated in a linear scale
+log_odds_ratio <- log(odds_ratio); log_odds_ratio
+
+# Calcute exp(CI) to get CI in an odds ratio scale
+CI_lower <- exp(log_odds_ratio - (1.96 * 0.07759735 * 2)); CI_lower
+```
