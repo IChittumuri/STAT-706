@@ -1,0 +1,143 @@
+---
+title: "Untitled"
+author: "Isabella Chittumuri"
+date: "10/2/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+What we're sort of having to grapple with is that everything happens on this linear scale. But that'd not where we interpret it. We interpret it on an odds scale. 
+
+# Point estimate
+
+## Logodds
+
+Let's pretend that we're changing beta_2. So let’s say we're adding 8.45 to x_2, to change beta_2 for logodd star.
+
+$$
+Logodds \\
+logodd = b_0 + b_1x_1 + b_2x_2 + b_3x_3 + b_4x_4 \\
+x_2^* = x_2 + 8.45 \\
+logodd^* = b_0 + b_1x_1 + b_2x_2^* + b_3x_3 + b_4x_4 \\
+$$
+
+## Odds
+
+Because it was in a log odds ratio, we want it in odds ratio. So we exponentiate it. We then just used the exponential properties to get the last equation. And we do the same thing with the log star.  
+
+$$
+Odd : exp(logodd) \\
+odd = e^(b_0 + b_1x_1 + b_2x_2) \\
+    = e^{b_0}e^{b_1x_1}e^{b_2x_2} \\
+
+odd^* = e^(b_0 + b_1x_1 + b_2x_2^*) \\
+    = e^{b_0}e^{b_1x_1}e^{b_2x_2^*} \\
+$$
+
+## Odds ratio
+
+The odds ratio is going to equal odds star divided by odd. All these beta_0 and beta_1s all cancel out. This is what I was talking about we don’t actually care about these other values over here. Because we know that they are going to cancel out because they are not changing. 
+
+Next were going to substitute for odd star where x_2 star is equation is x_2 + 8.45. We do normal multiplicative properties and exponential properties. And now we can again cancel everything out. 
+
+So now we're left with the odds ratio being equation to e^b_2*8.45. This is our odds ratio. 
+
+$$
+Odds ratio \\
+
+\frac{odd^*}{odd} = \frac{e^{b_0}e^{b_1x_1}e^{b_2x_2^*}}{e^{b_0}e^{b_1x_1}e^{b_2x_2}} \\
+\frac{odd^*}{odd} = \frac{e^{b_2x_2^*}}{e^{b_2x_2}} \\
+
+\frac{odd^*}{odd} = \frac{e^{b_2(x_2 + 8.45)}}{e^{b_2x_2}} \\
+= \frac{e^{b_2x_2 + b_2*8.45)}}{e^{b_2x_2}} \\
+= \frac{e^{b_2x_2} e^{b_2*8.45}}{e^{b_2x_2}} \\
+= e ^ {b_2*8.45}
+$$
+
+- Did we care what the original x_2 was? No, because it’s not in the final equation.
+- It doesn’t matter what the difference is between, your odds ratio is still the same. 
+- Your change in risk is not the same. The amount you move on the probability scale is not the same, but you're odds ratio for how much you move is actually going be the same. 
+- That's one of the reasons why these odds ratios are so handy is because they are extremely easy to work with when you're talking about stuff like this. We don’t actually care what x_2 is. 
+
+- Another thing is we don’t care what the other predictors are as long as they are constant in between these two terms. The terms can b whatever they want, the values can be whatever they want, nothing really matters. Just that you sort of change one value by 8.45 units, that’s how you can get the odds ratio.
+
+# Confidence intervals
+
+## Standard deviation
+
+If you have a random distribution and it had a standard deviation of x, example shown below.
+
+$$
+sd(X) = \sigma \\
+sd(8.45 * x) = 8.45*\sigma
+$$
+
+## Confidence Interval for standard error (se)
+
+So if we go back and think about the confidence interval for standard error (se). It’s going to be equal to the lower bound of mu is equal to mu minus 1.96 times the standard error. 
+
+So if we are changing our standard error by 8.45, how does that change the confidence interval? It would decrease by multiplying the standard error by 8.45. So your confidence interval increases or decreases by that much. 
+
+$$ 
+\mu_{low} = \mu - 1.96 * se \\
+
+\mu_{low}^* = \mu - 1.96 * se * 8.45 \\
+$$
+
+- You're CI grows by 8.45
+- Use the standard error (se) from the summary to get these very closely related estimates for changing 8.45 units instead of just using 1 unit. 
+
+Formula for 95% Confidence Interval for odds ratio (OR) 
+
+- You have to log the odds ratio because it's not one a linear scale. And the standard error is. 
+- So calculate the CI using the log_odds_ratio and the regular standard error
+- Then you take the exponent of the CI and get the intervals in an odds ratio scale.
+
+$$
+e^{log(OR) +- 1.96 * SE(log(OR))} \\
+$$
+
+- If you repeat the experiment, you expect, on average, that 95% of the CIs contain the true value of $beta_1$
+
+# Link Functions and distribution
+
+What’s the difference between the binomial and a Gaussian distribution? the Gaussian distribution actually is you run the glm function with just Gaussian, its actually the same thing as the lm function it's the normal linear model.
+- The family parameter for glm defines the loglikelihood function, the distribution of values you're interested in. 
+- And then you're also talking about the link function. Remember we’re using a logit link function for the binomial family. Each family has its own default. For the Gaussian, its actually just the identity function. 
+
+What are we trying to do with the link function? We're trying to take a value that goes from negative infinity to infinity and we're trying to map it to a zero to one space. That was why we needed a link function. there are different ways of doing that.
+- Logit is the logodds
+- Probit is the inverse of the normal distribution. 
+
+Basically say if you sample a normal distribution, it can actually take a number from negative infinity to infinity. And what you do is you map those numbers to the probability of seeing that number. That's how map negative infinity to infinity to a number between zero to one.
+
+Basically when you are looking at the logodds section, this linear equation (b0 + b1x1 + b2x2) can run from negative infinity to infinity. But we need it to turn it into a probability. So we say it's the logodd that we're actually modeling. If we inverse that we get a probability from zero to 1. 
+
+# GitHub
+
+## For class
+
+Go to the class GitHub, which is the repository. All you have to do it download this info is coming over there to code and download the zip. You can open the zip file with all the code and class slides. 
+
+If you look in the class GitHub, at the bottom there are additional resources on introduction to Git. It gives you how to install git, actually git is already included in Mac. 
+
+The way that you can use it is very fun. What you can do is once install git, you can access it through your terminal. And your terminal is like what's really going on under your computer. For example, you can find a folder and all the files that are there. 
+
+Instead of downloading the zip, you can come over here and under the column there's an https section. You can cope this link and let's say I want to do this and start working on my desktop, all I do is in the terminal, you write "git clone (pasted https link)" and what it does is that it downloads the file. 
+And then what you can do is you change the directory with "cd stat706-class-materials" and then what you can do is just call "git pull" and it will automatically update all those files in there and tells you exactly what changed.
+
+## General
+
+Git is one of those things that if you want to be a statistician and you want to go into data science you got to learn it. Because people will ask you about it. 
+
+
+
+
+
+
+

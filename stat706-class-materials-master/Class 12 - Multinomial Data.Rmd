@@ -1,0 +1,428 @@
+---
+title: "GLM I - Multinomial Data"
+subtitle: "November 12th, 2020"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    transition: 0
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.align = 'center')
+library(faraway)
+library(MASS)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(printr)
+library(tibble)
+library(purrr)
+library(broom)
+
+theme_set(theme_minimal()) # automatically set a simpler ggplot2 theme for all graphics
+```
+
+# Multinomial Logit Model (Chapter 7)
+
+## Set Up
+- (Note we are skipping Chapter 6)
+- A multinomial distribution is an extension of the binomial where the response can take more than two values. 
+- Let $Y_i$ be a random variable that falls into one of a finite number of categories (1, 2 ... _J_)
+- $p_{ij} = P(Y_i = j)$ and $\sum_{j=1}^J p_{ij} = 1$
+- When does this become the binary case?
+
+- Let $Y_{ij}$ by the number of observations that fall into category _j_ for observation _i_. $n_i = \sum_j Y_{ij}$
+- What are $n_i$ and $J$ for Bernoulli?
+
+$$
+P(Y_{i1} = y_{i1}, ..., Y_{iJ} = y_{iJ}) = \frac{n_i}{y_{i1}!...y_{iJ}!} p_{i1}^{y_{i1}} ... p_{iJ}^{y_{iJ}}
+$$
+
+- ordinal vs multinomial data
+
+## Election Study :)
+
+- collapse party into 3 categories and create numeric value for income (code not shown)
+
+```{r, echo = FALSE}
+data(nes96, package="faraway")
+party <- nes96$PID
+levels(party) <- c("Democrat","Democrat","Independent","Independent", "Independent","Republican","Republican")
+inca <- c(1.5,4,6,8,9.5,10.5,11.5,12.5,13.5,14.5,16,18.5,21,23.5, 27.5,32.5,37.5,42.5,47.5,55,67.5,82.5,97.5,115)
+income <- inca[unclass(nes96$income)]
+rnes96 <- data.frame(party, income, education=nes96$educ, age=nes96$age)
+```
+
+
+```{r, echo = TRUE}
+summary(rnes96)
+```
+
+## Some Graphs - Party by Education
+
+```{r}
+rnes96 %>% 
+  group_by(education, party) %>% 
+  summarise(n = n(), .groups = "drop_last") %>% 
+  mutate(prop = n/sum(n)) %>% 
+  ggplot(aes(x = education, y = prop, linetype = party)) +
+  geom_line(aes(group = party))
+```
+
+## Some more graphs - Party by Income
+
+```{r}
+rnes96 %>% 
+  group_by(income, party) %>% 
+  summarise(n = n(), .groups = "drop_last") %>% 
+  mutate(prop = n/sum(n)) %>% 
+  ggplot(aes(x = income, y = prop, color = party, weight = n)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "loess", se = F, formula = y ~ x)
+```
+
+## Fit the Model
+
+```{r, echo = TRUE, message=FALSE}
+library(nnet)
+rnes96_not_ordinal <- rnes96
+rnes96_not_ordinal$education <- factor(rnes96_not_ordinal$education, ordered = FALSE)
+mmod_not_ord <- multinom(party ~ age + education + income, rnes96_not_ordinal)
+mmod <- multinom(party ~ age + education + income, rnes96)
+
+AIC(mmod_not_ord)
+AIC(mmod)
+
+mmodi <- step(mmod, trace = 1) # we can also use deviance etc.
+```
+
+## Lets just look at income
+
+```{r echo = TRUE}
+fake_data <- data.frame(income = 1:110)
+fake_data <- cbind(fake_data, predict(mmodi, fake_data, type = "probs"))
+summary(fake_data)
+```
+## Income as a graph
+
+```{r echo=TRUE, fig.height=3, fig.width=6}
+fake_data %>% 
+  tidyr::pivot_longer(-income) %>% 
+  ggplot(aes( x = income, y = value, color = name)) +
+  geom_line()
+```
+
+- what will be chosen as the prediction at different income levels?
+- Will independent ever be chosen?
+
+## Interpret Coefficients
+
+```{r, echo = TRUE}
+broom::tidy(mmodi)
+```
+
+
+## Interpret Coefficients
+
+$$
+\eta_{ij} = x^T_i \beta_j = log(\frac{p_{ij}}{p_{i1}})
+$$
+
+- One category is baseline such that:
+
+$$
+p_{i1} = 1 - \sum^J_{j = 2} p_{ij}
+$$
+
+- Therefore:
+
+$$
+p_{ij} = \frac{exp(\eta_{ij})}{1 + \sum^J_{j=2} exp(\eta_{ij})} \\
+ = \frac{exp(\eta_{ij})}{\sum^J_{j=1} exp(\eta_{ij})}
+$$
+Why?
+
+
+## Interpret Coefficients (intercept)
+
+```{r, echo = TRUE}
+cc <- c(0,-1.17493,-0.95036)
+exp(cc)/sum(exp(cc))
+
+predict(mmodi,data.frame(income=0),type="probs")
+```
+
+## Interpret Coefficients
+
+```{r, echo = TRUE}
+broom::tidy(mmodi, exponentiate = TRUE)
+```
+
+```{r}
+rnes96_relevel <- rnes96
+rnes96_relevel$party <- relevel(factor(rnes96_relevel$party, 
+                                       ordered = FALSE), "Independent")
+
+multinom(party ~ income, data = rnes96_relevel) %>% 
+  tidy(exponentiate = TRUE)
+```
+
+
+
+
+- What about log odds from independent to republican?
+
+
+# Hierarchical or Nested Responses
+
+## Set Up
+
+- Live births with deformations of the central nervous system
+
+```{r, echo = TRUE}
+data(cns, package="faraway")
+cns %>% summary
+```
+
+## Outcome
+
+
+- 4 Groups, but really:
+
+```{r}
+knitr::include_graphics('resources/class 12 - cns.png')
+```
+
+## Modeling - Equations
+
+$$
+p_{i1}^{y_{i1}}p_{i2}^{y_{i2}}p_{i3}^{y_{i3}}p_{i4}^{y_{i4}}
+$$
+create a new variables $p_{ic} = p_{i2} + p_{i3} + p_{i4}$ - what does this represent?
+
+Rewrite above as:
+
+$$
+p_{i1}^{y_{i1}}p_{ic}^{y_{i2} + y_{i3} + y_{i4}} \left(\frac{p_{i2}}{p_{ic}}\right)^{y_{i2}} \left(\frac{p_{i3}}{p_{ic}}\right)^{y_{i3}} \left(\frac{p_{i4}}{p_{ic}}\right)^{y_{i4}} 
+$$
+- first part is now a binomial and second part of the product is multinomial likelihood conditional on presence of CNS
+
+## Modeling - Binomial Part
+
+
+```{r, echo = TRUE}
+cns$CNS <- cns$An+cns$Sp+cns$Other
+ggplot(cns, aes(x = Water, y = log(CNS/NoCNS))) +
+  geom_label(aes(label = Work, fill = Work))
+```
+
+## Fitting Model
+
+
+```{r, echo = TRUE}
+# issue fitting - Water and Area are linked
+full_mod <- glm(cbind(CNS, NoCNS) ~ Water + Work + Area, data = cns, family = binomial)
+mod1 <- glm(cbind(CNS, NoCNS) ~ Water + Work, data = cns, family = binomial)
+mod2 <- glm(cbind(CNS, NoCNS) ~ Area + Work, data = cns, family = binomial)
+
+AIC(mod1)
+AIC(mod2)
+```
+
+```{r}
+full_mod
+```
+
+
+## Explore Residuals
+
+```{r}
+halfnorm(residuals(mod1))
+```
+
+## Explore Residuals further
+
+```{r}
+mod1$data[10, ]
+```
+
+```{r, echo = TRUE}
+mod1_no_out <- update(mod1, data = cns[-10, ])
+glance(mod1)
+glance(mod1_no_out)
+```
+
+
+- no real difference in estimates so lets keep it in
+
+```{r, eval = FALSE, echo = TRUE}
+tidy(mod1)
+tidy(mod1_no_out)
+```
+
+## Binomial model - interpertation
+
+```{r, echo = TRUE}
+tidy(mod1, exponentiate = T)
+```
+- increase in 100 water hardness
+
+```{r, echo = TRUE}
+exp(mod1$coefficients['Water']*100)
+```
+
+
+## Create Multinomial
+
+```{r, message = FALSE}
+cmmod <- multinom(cbind(An,Sp,Other) ~ Water + Work, cns)
+summary(cmmod)
+```
+
+## Create Multinomial - step
+
+```{r}
+cmmod <- (step(cmmod))
+```
+
+## Multi-step Output
+
+```{r}
+summary(cmmod)
+```
+## Show Rates
+
+```{r, echo = TRUE}
+cc <- c(0, as.vector(coef(cmmod)))
+names(cc) <- c("An","Sp","Other") 
+exp(cc)/sum(exp(cc))
+```
+
+
+```{r, echo = TRUE}
+colSums(cns %>% select(An, Sp, Other ))/sum(cns$CNS)
+```
+
+
+## Multinomial model on all the data
+
+```{r}
+summary(multinom(cbind(NoCNS,An,Sp,Other) ~ Water + Work, cns))
+```
+
+# Ordinal Multinomial Responses
+
+## Setup
+
+- J ordered categories with ordinal response
+
+```{r, echo = TRUE}
+letter_samp <- sample(LETTERS[1:5], 100, replace = T)
+table(letter_samp)
+cumsum(table(letter_samp))
+```
+
+- $\gamma_{ij} = P(Y_i \leq j)$:
+
+```{r}
+cumsum(table(letter_samp))/100
+```
+
+## Link Functions
+
+- $\theta$ does not depend on predictors $x$
+- $\beta$ does not depend on categories
+
+$$
+g(\gamma_{ij}) = \theta_j - x_i^T\beta
+$$
+- link functions for $g$ are logit, probit an cloglog
+
+
+## Latent Variable interpertation
+
+- Suppose there is a true continuous variable ($Z_i$) that we only observe through a discritized version ($Y_i$) where $Y_i = j$ is observed if $\theta_{j-1} < Z_i \leq \theta_j$.
+- Suppose that $Z_i - \beta^Tx_i$ has distribution $F$ then:
+
+$$
+P(Y_i \leq j) = P(Z_i \leq \theta_j) = P(Z_i - \beta^Tx_i \leq \theta_j - \beta^Tx_i) = F(\theta_j - \beta^Tx_i)
+$$
+- Choosing different underlying latent variable distributions leads to different link functions
+
+## Visualization
+
+```{r}
+letters_df <- data.frame(y = as.factor(letter_samp))
+podds <- polr(y ~ 1, letters_df)
+
+df_lab <- tibble(
+  x = c(-2, ((podds$zeta + lag(podds$zeta))/2)[-1], 2),
+  y = .075,
+  label = c("A", "B", "C", "D", "E")
+  
+  
+)
+
+tibble(x = seq(-3, 3, by = 0.1),
+       y = dlogis(x)) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_line() +
+  geom_vline(xintercept = podds$zeta, linetype = "longdash") +
+  geom_label(data = df_lab, aes(label = label))
+```
+
+## Proportional Odds
+
+
+```{r,out.width="100%"}
+knitr::include_graphics('resources/class-12-prop-odds.png')
+```
+
+
+## Fitting a model
+
+- All likelihood methods apply (deviance, AIC etc)
+
+```{r, echo  = TRUE}
+library(MASS)
+pomod <- polr(party ~ age + education + income, rnes96)
+pomodi <- step(pomod)
+```
+
+## Check prop odds
+
+```{r}
+pim <- with(rnes96,prop.table(table(income,party),1)) 
+plot(logit(pim[,1])-logit(pim[,1]+pim[,2])) # from dem to ind
+```
+
+## Interpertation
+
+```{r}
+summary(pomodi)
+```
+- We can say that the odds of moving from Democrat to Independent/Republican category (or from Democrat/Independent to Republican) increase by a factor of exp(0.013120) = 1.0132 as income increases by one unit ($1000)
+
+## Predicted Probs
+
+income = 0, Dem
+
+```{r, echo = TRUE}
+ilogit(0.209)
+```
+
+income = 0, Ind
+
+```{r, echo = TRUE}
+ilogit(1.292)-ilogit(0.209)
+```
+
+## Generalization
+
+- move to book if we get here
+```{r, include = FALSE}
+library(VGAM)
+```
+
