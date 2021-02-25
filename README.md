@@ -10,8 +10,8 @@ Required Text:
 
 Optional Texts:
 - Applied Linear Statistical Models, 5th edition, Kutner, Naschtsheim, Neter and Li
-- Statistical Rethinking, 2nd edition, McElreath
-- R for Data Science, Wickham
+- Statistical Rethinking, 2nd edition, McElreath https://xcelab.net/rm/statistical-rethinking/
+- R for Data Science, Wickham http://r4ds.had.co.nz
    
 Material Cover (based on chapters in [ELM]):
 
